@@ -82,58 +82,98 @@ module first_joint() {
     }
 }
 
-// The probe
-// Sideways protrusion used as alignment scale
-translate([-flag_clearance-(probe_width+hinge_width)/2,-hinge_width,0])
-    cube([flag_clearance+(hinge_width+probe_width)/2,hinge_width,body_height]);
-// Pointy probe bit. Has a half-tough chopped out for a probe wire.
-// This also stops adhesive going into the flexures...
-difference() {
-    // Body of probe
-    translate([0,-probe_length,0]) {
+// Perforated tab used to hold the fleures etc. to the Z Axis Driver's Probe Arm
+ module attachment_tab(thickness=tab_thick) rotate([90,0,0]) {
+    difference() {
+        hull() {
+            // Nice, smooth transition to the handle
+            translate([tab_rad,handle_depth+tab_rad,0]) cylinder(h=thickness,r=tab_rad,$fn=64);
+            cube([handle_depth,tab_thick,thickness]);
+        }
+        // Perforate for a screw
+        translate([tab_rad,handle_depth+tab_rad,0]) rotate([0,0,180/8])
+            cylinder(h=thickness*3,r=screw_rad,center=true,$fn=8);
+    }
+}
+
+// The whole flexured probe holder assembly
+module probe_holder_assembly() {
+    // Sideways protrusion used as alignment scale
+    translate([-flag_clearance-(probe_width+hinge_width)/2,-hinge_width,0])
+        cube([flag_clearance+(hinge_width+probe_width)/2,hinge_width,body_height]);
+    // Pointy probe bit. Has a half-tough chopped out for a probe wire.
+    // This also stops adhesive going into the flexures...
+    difference() {
+        // Body of probe
+        translate([0,-probe_length,0]) {
+            hull() {
+                // Pointy end
+                cylinder(h=probe_height,r=0.1);
+                // Main arm of probe
+                translate([-probe_width/2,point_length,0])
+                    cube([probe_width,probe_length+probe_hinge_sep+flexure_thick-point_length,probe_height]);
+            }
+        }
+        // Cut half of the probe body away to leave a trough
+        translate([wire_probe_rad-probe_width/2,0,body_height+probe_height/2])
+            cube([probe_width,handle_length*4,probe_height],center=true);
+    }
+
+    // The flag arm
+    translate([(-probe_width-hinge_width)/2-flag_clearance,small_gap,0])
         hull() {
             // Pointy end
-            cylinder(h=probe_height,r=0.1);
-            // Main arm of probe
-            translate([-probe_width/2,point_length,0])
-                cube([probe_width,probe_length+probe_hinge_sep+flexure_thick-point_length,probe_height]);
+            translate([hinge_width/2,0.1,0]) cylinder(h=body_height/2,r=0.1);
+            translate([0,point_length,0]) cube([hinge_width,flag_length-point_length,body_height]);
+        }
+
+
+    // Flexure out front
+    translate([0,probe_hinge_sep+flexure_thick,0])
+            first_joint();
+    // Two hinge flexuress anchoring the probe to the holder
+    translate([probe_width/2,0,0]) probe_hinge();
+    translate([probe_width/2,probe_hinge_sep,0]) probe_hinge();
+    // The bit that holds on to the flexures
+    translate([probe_hinge_length+probe_width/2,-flexure_thick,0]) {
+        // Flat part attached to flexures
+        cube([handle_depth,handle_length,body_height*2]);
+        // Stiffening strip
+        translate([handle_depth-body_height,0,0]) cube([body_height,handle_length,body_height*4]);
+    }
+    // Tab to attach to probe. Needs to be at roughly 90 degrees to the flexure
+    translate([probe_hinge_length+hinge_width,tab_thick-flexure_thick,0]) 
+        attachment_tab();
+}
+
+protective_wall_thick=1;    // Thickness of the protective edge around the cap and probe tip
+protective_edge_height=2;
+assumed_tip_length=6;
+tip_cover_len=probe_length+assumed_tip_length+protective_wall_thick;
+// A protective cover that allows the probe to be stored.
+module probe_endcap() difference() {
+    union() {
+        // Tab to screw to the probe assembly.
+        // Top part has a bit of a standoff
+        translate([probe_hinge_length+hinge_width+tab_rad,-hinge_width-flexure_thick,tab_rad+handle_depth])
+            rotate([90,0,0]) cylinder(h=hinge_width,r=tab_rad,$fn=64);
+        // Bottom part is hullted to the tip cover
+        hull() {
+            translate([probe_hinge_length+hinge_width+tab_rad,-2*hinge_width,tab_rad+handle_depth])
+                rotate([90,0,0]) cylinder(h=tip_cover_len,r=tab_rad,$fn=64);
+            // Cover for the tip. Hinge_width here puts us below the arm sticking out of the tip
+            translate([0,-2*hinge_width,probe_height/4]) rotate([90,0,0]) cylinder(h=tip_cover_len,r=probe_width+1+protective_wall_thick,$fn=24);
         }
     }
-    // Cut half of the probe body away to leave a trough
-    translate([wire_probe_rad-probe_width/2,0,body_height+probe_height/2])
-        cube([probe_width,handle_length*4,probe_height],center=true);
+    // Hole for the tip to go into
+    translate([0,0.01-2*hinge_width,probe_height/4]) rotate([90,0,0]) cylinder(h=probe_length+assumed_tip_length,r=probe_width+1,$fn=24);
+    // Hole for an M3 screw
+    translate([probe_hinge_length+hinge_width+tab_rad,-flexure_thick,tab_rad+handle_depth])
+        rotate([90,0,0]) cylinder(h=1000,r=screw_rad,center=true,$fn=8);
 }
 
-// The flag arm
-translate([(-probe_width-hinge_width)/2-flag_clearance,small_gap,0])
-    hull() {
-        // Pointy end
-        translate([hinge_width/2,0.1,0]) cylinder(h=body_height/2,r=0.1);
-        translate([0,point_length,0]) cube([hinge_width,flag_length-point_length,body_height]);
-    }
-
-
-// Flexure out front
-translate([0,probe_hinge_sep+flexure_thick,0])
-        first_joint();
-// Two hinge flexuress anchoring the probe to the holder
-translate([probe_width/2,0,0]) probe_hinge();
-translate([probe_width/2,probe_hinge_sep,0]) probe_hinge();
-// The bit that holds on to the flexures
-translate([probe_hinge_length+probe_width/2,-flexure_thick,0]) {
-    // Flat part attached to flexures
-    cube([handle_depth,handle_length,body_height*2]);
-    // Stiffening strip
-    translate([handle_depth-body_height,0,0]) cube([body_height,handle_length,body_height*4]);
-}
-// Tab to attach to probe. Needs to be at roughly 90 degrees to the flexure
-translate([probe_hinge_length+hinge_width,tab_thick-flexure_thick,0]) rotate([90,0,0]) difference() {
-    hull() {
-        // Nice, smooth transition to the handle
-        translate([tab_rad,handle_depth+tab_rad,0]) cylinder(h=tab_thick,r=tab_rad);
-        cube([handle_depth,tab_thick,tab_thick]);
-    }
-    // Perforate for a screw
-    translate([tab_rad,handle_depth+tab_rad,0]) rotate([0,0,180/8])
-        cylinder(h=tab_thick*3,r=screw_rad,center=true,$fn=8);
-}
+probe_holder_assembly();
+// Position the endcap to print flat and snug
+translate([0,-10,2*hinge_width+tip_cover_len])
+    rotate([90,0,20]) 
+        probe_endcap();
